@@ -16,15 +16,15 @@ Under the hood it's two tiny open models run natively on Apple's **MLX** GPU run
 | **summarize** | Humaneyes (Pegasus-base) | ~2.3 GB | condense a passage to its core point |
 | **auto** | built-in classifier (off by default) | — | routes each input to declaude or summarize |
 
-## Why *this* is better than "just prompt it harder"
+## Why these two models
 
-We ran a **blind, 20-sample eval** — de-clauded output rated purely on "which reads most
-human," with model labels shuffled per sample so you can't pattern-match:
+`declaude` delegates to two tiny open models, each good at one job:
 
-- **Lynote wins 13 / 14** blind picks (one sample preferred the raw original).
-- Humaneyes' summaries were consistently rejected as de-claude output (it truncates meaning).
+- **Lynote** (T5-small) edits text in place — full-length, meaning-preserving rewrite that
+  strips AI clichés *without dropping what you said*.
+- **Humaneyes** (Pegasus-base) condenses a passage to its core point.
 
-The cost-to-run comparison (M4 Max, MLX GPU):
+Characteristic figures (M4 Max, MLX GPU):
 
 | | rewrite speed | peak memory |
 |---|---|---|
