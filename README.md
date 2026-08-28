@@ -36,8 +36,15 @@ pipeline**, not a heavy app.
 
 ## Install
 
+**Recommended — Homebrew tap** (checksums, versioning, upgrade/uninstall):
+
 ```bash
-# from a built release (macOS arm64 binary)
+brew install terraboops/tap/declaude
+```
+
+Alternative — grab the release binary directly (macOS arm64, ~373 MB):
+
+```bash
 curl -L -o declaude https://github.com/terraboops/declaude/releases/latest/download/declaude-macos-arm64
 chmod +x declaude && sudo mv declaude /usr/local/bin/
 ```
