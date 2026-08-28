@@ -1,0 +1,12 @@
+# models are downloaded/kept locally, not committed
+models/
+# python
+__pycache__/
+*.pyc
+.venv/
+# build artifacts
+build/
+dist/
+*.spec
+# local test outputs
+out_*.txt
