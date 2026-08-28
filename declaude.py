@@ -74,6 +74,18 @@ def classify(text: str):
     return decision, round(abs(score), 2)
 
 
+def fetch_models():
+    """Download Lynote (en) + Humaneyes weights to the local HF cache."""
+    from huggingface_hub import snapshot_download
+    repos = [("Lynote/humanize-text-model", "en,zh"),
+             ("Eemansleepdeprived/Humaneyes", None)]
+    for repo, subs in repos:
+        snap = snapshot_download(repo_id=repo, allow_patterns=["*"])
+        print(f"[declaude] cached {repo} -> {snap}", flush=True)
+        _ = subs
+    print("[declaude] models ready", flush=True)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="declaude",
                                  description="De-AI your text locally (MLX).")
@@ -88,7 +100,12 @@ def main(argv=None):
     g.add_argument("--auto-mode", action="store_true",
                    help="route input via the classifier (declaude vs summarize)")
     ap.add_argument("--max-new", type=int, default=None)
+    ap.add_argument("--fetch-models", action="store_true",
+                    help="download model weights to the local cache, then exit")
     a = ap.parse_args(argv)
+    if a.fetch_models:
+        fetch_models()
+        return 0
 
     text = a.text
     if not text and a.file:

@@ -50,6 +50,15 @@ git clone https://github.com/terraboops/declaude && cd declaude
 ./declaude --help
 ```
 
+On first run, get the model weights (Lynote ~242 MB + Humaneyes ~2.3 GB) cached locally —
+
+```bash
+declaude --fetch-models
+```
+
+They're stored in the standard HuggingFace cache; nothing is committed to the repo, and
+everything runs on-device.
+
 ## Usage
 
 ```bash
