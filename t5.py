@@ -117,10 +117,9 @@ def causal_mask(q_len, k_len):
 # Head dim is contiguous (dim index 2 post-reshape) -- the convention used by
 # BOTH HF T5 (transformers>=4.50) and HF Pegasus. q/k/v: (seq, d_model).
 # --------------------------------------------------------------------------- #
-def mha(q, k, v, o_proj, num_heads, d_kv, attn_bias=None, causal=False):
+def mha(q, k, v, o_proj, num_heads, d_kv, attn_bias=None, causal=False, scale=1.0):
     q_len = q.shape[0]
     k_len = k.shape[0]
-    scale = 1.0 / math.sqrt(d_kv)
     Q = mx.reshape(q, (q_len, num_heads, d_kv)).transpose(1, 0, 2)
     K = mx.reshape(k, (k_len, num_heads, d_kv)).transpose(1, 0, 2)
     V = mx.reshape(v, (k_len, num_heads, d_kv)).transpose(1, 0, 2)
@@ -144,7 +143,7 @@ class EncoderLayer:
         self.ln2, self.wi, self.wo = ln2, wi, wo
         self.rel_bias = rel_bias
 
-    def forward(self, hidden, heads, d_kv, buckets, max_dist):
+    def forward(self, hidden, heads, d_kv, buckets, max_dist, scale=1.0):
         residual = hidden
         h = self.ln1(hidden)
         q = self.q(h)
@@ -157,7 +156,7 @@ class EncoderLayer:
                 position_delta(ql, ql), True, buckets, max_dist)
             bias = bias_from_buckets(self.rel_bias, bucket)
         hidden = residual + mha(q, k, v, self.o, heads, d_kv,
-                                attn_bias=bias, causal=False)
+                                attn_bias=bias, causal=False, scale=scale)
         residual = hidden
         h = self.ln2(hidden)
         h = self.wi(h)
@@ -179,7 +178,7 @@ class DecoderLayer:
         self.ln2, self.cq, self.ck, self.cv, self.co = ln2, cq, ck, cv, co
         self.ln3, self.wi, self.wo = ln3, wi, wo
 
-    def forward_self(self, hidden, heads, d_kv, buckets, max_dist):
+    def forward_self(self, hidden, heads, d_kv, buckets, max_dist, scale=1.0):
         residual = hidden
         h = self.ln1(hidden)
         q = self.q(h)
@@ -192,17 +191,17 @@ class DecoderLayer:
                 position_delta(ql, ql), False, buckets, max_dist)
             bias = bias_from_buckets(self.rel_bias, bucket)
         hidden = residual + mha(q, k, v, self.o, heads, d_kv,
-                                attn_bias=bias, causal=True)
+                                attn_bias=bias, causal=True, scale=scale)
         return hidden
 
-    def forward_cross(self, hidden, enc_out, heads, d_kv):
+    def forward_cross(self, hidden, enc_out, heads, d_kv, scale=1.0):
         residual = hidden
         h = self.ln2(hidden)
         q = self.cq(h)
         k = self.ck(enc_out)
         v = self.cv(enc_out)
         hidden = residual + mha(q, k, v, self.co, heads, d_kv,
-                                attn_bias=None, causal=False)
+                                attn_bias=None, causal=False, scale=scale)
         return hidden
 
     def forward_ff(self, hidden):
@@ -213,9 +212,9 @@ class DecoderLayer:
         h = self.wo(h)
         return residual + h
 
-    def forward(self, hidden, enc_out, heads, d_kv, buckets, max_dist):
-        hidden = self.forward_self(hidden, heads, d_kv, buckets, max_dist)
-        hidden = self.forward_cross(hidden, enc_out, heads, d_kv)
+    def forward(self, hidden, enc_out, heads, d_kv, buckets, max_dist, scale=1.0):
+        hidden = self.forward_self(hidden, heads, d_kv, buckets, max_dist, scale)
+        hidden = self.forward_cross(hidden, enc_out, heads, d_kv, scale)
         return self.forward_ff(hidden)
 
 
@@ -227,7 +226,8 @@ class T5ConditionalMLX:
                  num_encoder_layers, num_decoder_layers, num_heads, d_kv,
                  vocab_size, positional="relative", rel_buckets=32,
                  rel_max_dist=128, scale_embedding=False,
-                 layer_norm_eps=1e-6, add_final_layer_norm=True):
+                 layer_norm_eps=1e-6, add_final_layer_norm=True,
+                 attn_scale=None):
         assert style in ("t5", "pegasus")
         self.style = style
         self.d_model = d_model
@@ -241,6 +241,9 @@ class T5ConditionalMLX:
         self.scale_embedding = scale_embedding
         self.eps = layer_norm_eps
         self.add_final_layer_norm = add_final_layer_norm
+        # T5 folds relative bias in and does NOT scale q·k (HF self.scaling=1.0).
+        # Pegasus scales by head_dim**-0.5 (set explicitly by caller).
+        self.attn_scale = attn_scale if attn_scale is not None else 1.0
         self.w = self._load(snapshot_dir)
         self._build(num_encoder_layers, num_decoder_layers)
 
@@ -358,18 +361,20 @@ class T5ConditionalMLX:
 
     def encode(self, input_ids):
         hidden = self._embed_inputs(input_ids, self.pos_enc)
+        sc = self.attn_scale
         for layer in self.enc_layers:
             hidden = layer.forward(hidden, self.num_heads, self.d_kv,
-                                   self.rel_buckets, self.rel_max_dist)
+                                   self.rel_buckets, self.rel_max_dist, sc)
         if self.add_final_layer_norm:
             hidden = self.enc_final(hidden)
         return hidden
 
     def _decoder_logits(self, decoder_ids, enc_out):
         hidden = self._embed_inputs(decoder_ids, self.pos_dec)
+        sc = self.attn_scale
         for layer in self.dec_layers:
             hidden = layer.forward(hidden, enc_out, self.num_heads, self.d_kv,
-                                   self.rel_buckets, self.rel_max_dist)
+                                   self.rel_buckets, self.rel_max_dist, sc)
         if self.add_final_layer_norm:
             hidden = self.dec_final(hidden)
         logits = mx.matmul(hidden, self.embed.T)  # (L, vocab)

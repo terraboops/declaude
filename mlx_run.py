@@ -52,7 +52,8 @@ MODELS = {
                        num_encoder_layers=16, num_decoder_layers=16,
                        num_heads=16, d_kv=64, vocab_size=96103,
                        positional="absolute", scale_embedding=True,
-                       layer_norm_eps=1e-6, add_final_layer_norm=True),
+                       layer_norm_eps=1e-6, add_final_layer_norm=True,
+                       attn_scale=1.0 / 8.0),
         "tokenizer": "PegasusTokenizer",
         # absolute learned peak positions are (60, 1024); cap both sides
         "max_enc": 55,
@@ -113,6 +114,7 @@ def main():
         scale_embedding=cfg["scale_embedding"],
         layer_norm_eps=cfg["layer_norm_eps"],
         add_final_layer_norm=cfg["add_final_layer_norm"],
+        attn_scale=cfg.get("attn_scale"),
     )
     print(f"[{args.model}] model built on MLX", flush=True)
 
