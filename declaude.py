@@ -49,7 +49,21 @@ def generate(m, tok, text, spec, max_new=None):
 AI_CLICHE = [r"\bit is important\b", r"\bmoreover\b", r"\bfurthermore\b", r"\bin conclusion\b",
              r"\bhowever\b", r"\bleveraging\b", r"\bleverage\b", r"\brobust\b",
              r"\bunderscore\b", r"\bnavigate[ds]?\b", r"\bsignificant[ly]?\b", r"\bnotably\b",
-             r"\btailored\b", r"\bseamless(?:ly)?\b"]
+             r"\btailored\b", r"\bseamless(?:ly)?\b",
+             # --- transition-crutch tells (Terra feedback 2026-09-04, "Scaling Out") ---
+             # formulaic bridges that read as AI even when the lexical vocab is clean
+             r"\bI keep bumping into\b",
+             r"\bLet me be clear about (?:the claim|this|something)\b",
+             r"\bthat's kind of the point\b",
+             r"\bthat's the whole trade\b",
+             r"\bthe telling bit\b",
+             r"\bthe quiet lesson\b",
+             r"\bthe lesson (?:keeps landing|lands on the same spot)\b",
+             r"\bthe shape holds\b",
+             r"\bworth repeating\b",
+             r"\bconnecting the dots\b",
+             r"\bhere's the part I actually\b",
+             r"\bthe part that matters here\b"]
 DENSITY = [r"\bfirst\b", r"\bsecond\b", r"\bfinally\b", r"\bsteps?\b", r"\bpercent\b",
            r"\bquarters?\b", r"\breports?\b", r"\bguidelines?\b", r"\breview\b", r"\bmetrics?\b"]
 _AI = [re.compile(p, re.I) for p in AI_CLICHE]
